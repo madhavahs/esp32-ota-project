@@ -1,1 +1,55 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <NetworkClientSecure.h>
+#include <Update.h>
 
+// --- YOUR WI-FI CREDENTIALS ---
+const char* ssid = "wifi";
+const char* password = "123456789";
+
+// --- EXACT SAME URL FOR BOTH CODES ---
+const char* firmwareURL = "https://github.com/madhavahs/esp32-ota-project/blob/main/firmware.bin";
+
+const int ledPlugin = 2;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPlugin, OUTPUT);
+  Serial.println("Running Code Version 2 (Fast Blink / GPS)...");
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  // Keep checking for future updates
+  performRemoteUpdate();
+}
+
+void loop() {
+  // Version 2 behavior: FAST Blink (or your GPS logic)
+  digitalWrite(ledPlugin, HIGH);
+  delay(100);
+  digitalWrite(ledPlugin, LOW);
+  delay(100);
+}
+
+void performRemoteUpdate() {
+  NetworkClientSecure secureClient;
+  secureClient.setInsecure();
+  HTTPClient http;
+  http.begin(secureClient, firmwareURL);
+  
+  if (http.GET() > 0 && http.GET() == HTTP_CODE_OK) {
+    int contentLength = http.getSize();
+    if (Update.begin(contentLength)) {
+      WiFiClient *client = http.getStreamPtr();
+      Update.writeStream(*client);
+      if (Update.end() && Update.isFinished()) {
+        ESP.restart();
+      }
+    }
+  }
+  http.end();
+}
